@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDL Analytics — Dashboard (scaffold)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2f3a;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --accent: #7c5cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 14px; border-radius: 10px; margin-bottom: 20px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  label { font-size: 12px; color: var(--muted); }
+  input, select {
+    background: #0f1115; border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 6px; font-size: 13px; min-width: 220px;
+  }
+  button {
+    background: var(--accent); color: white; border: none; padding: 9px 16px;
+    border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+  }
+  .card h2 { font-size: 14px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .totals { display: flex; gap: 24px; }
+  .totals .stat { flex: 1; }
+  .totals .num { font-size: 28px; font-weight: 700; }
+  .totals .lbl { font-size: 12px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  .empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+  .status { font-size: 12px; color: var(--muted); margin-top: -10px; margin-bottom: 16px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>PDL Analytics</h1>
+<div class="sub">Scaffold dashboard — not connected to a live Worker yet. Fill in an endpoint below once one is deployed.</div>
+
+<div class="controls">
+  <div class="field">
+    <label for="endpoint">Worker endpoint</label>
+    <input id="endpoint" type="text" placeholder="https://pdl-analytics.your-subdomain.workers.dev">
+  </div>
+  <div class="field">
+    <label for="site">Site</label>
+    <input id="site" type="text" placeholder="parkerdata.link">
+  </div>
+  <div class="field">
+    <label for="days">Window</label>
+    <select id="days">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+  </div>
+  <button id="loadBtn">Load</button>
+</div>
+
+<div id="statusMsg" class="status"></div>
+
+<div class="card" style="margin-bottom:16px;">
+  <h2>Overview</h2>
+  <div class="totals">
+    <div class="stat"><div class="num" id="totPageviews">–</div><div class="lbl">Pageviews</div></div>
+    <div class="stat"><div class="num" id="totClicks">–</div><div class="lbl">Link clicks</div></div>
+    <div class="stat"><div class="num" id="totVisitors">–</div><div class="lbl">Unique visitors</div></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Pageviews by country</h2>
+    <canvas id="countryChart" height="220"></canvas>
+    <div id="countryEmpty" class="empty" style="display:none;">No data yet</div>
+  </div>
+
+  <div class="card">
+    <h2>Browser / OS</h2>
+    <canvas id="browserChart" height="220"></canvas>
+    <div id="browserEmpty" class="empty" style="display:none;">No data yet</div>
+  </div>
+
+  <div class="card">
+    <h2>Top clicked links</h2>
+    <table id="linksTable">
+      <thead><tr><th>Link</th><th>Text</th><th>Clicks</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="linksEmpty" class="empty" style="display:none;">No clicks recorded yet</div>
+  </div>
+
+  <div class="card">
+    <h2>Recent events</h2>
+    <table id="recentTable">
+      <thead><tr><th>Type</th><th>Page</th><th>Country</th><th>Browser</th><th>When</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="recentEmpty" class="empty" style="display:none;">No events recorded yet</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var countryChart = null, browserChart = null;
+
+  function setStatus(msg, isError) {
+    var el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    el.style.color = isError ? '#ff6b6b' : '#8b93a7';
+  }
+
+  function fillTable(tableId, emptyId, rows, columns) {
+    var tbody = document.querySelector('#' + tableId + ' tbody');
+    tbody.innerHTML = '';
+    document.getElementById(emptyId).style.display = rows.length ? 'none' : 'block';
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      columns.forEach(function (col) {
+        var td = document.createElement('td');
+        td.textContent = row[col] == null ? '' : row[col];
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderBarChart(canvasId, existing, labels, data, color) {
+    var ctx = document.getElementById(canvasId).getContext('2d');
+    if (existing) existing.destroy();
+    return new Chart(ctx, {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: color }] },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8b93a7' }, grid: { color: '#2a2f3a' } },
+          y: { ticks: { color: '#8b93a7' }, grid: { color: '#2a2f3a' } }
+        }
+      }
+    });
+  }
+
+  async function load() {
+    var endpoint = document.getElementById('endpoint').value.trim().replace(/\/$/, '');
+    var site = document.getElementById('site').value.trim();
+    var days = document.getElementById('days').value;
+
+    if (!endpoint || !site) {
+      setStatus('Enter both a Worker endpoint and a site name.', true);
+      return;
+    }
+
+    setStatus('Loading…');
+    try {
+      var res = await fetch(endpoint + '/api/summary?site=' + encodeURIComponent(site) + '&days=' + days);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var data = await res.json();
+
+      document.getElementById('totPageviews').textContent = data.totals.pageviews || 0;
+      document.getElementById('totClicks').textContent = data.totals.clicks || 0;
+      document.getElementById('totVisitors').textContent = data.totals.visitors || 0;
+
+      var countries = data.by_country || [];
+      document.getElementById('countryEmpty').style.display = countries.length ? 'none' : 'block';
+      countryChart = renderBarChart('countryChart', countryChart,
+        countries.map(function (r) { return r.country || 'Unknown'; }),
+        countries.map(function (r) { return r.n; }), '#7c5cff');
+
+      var browsers = data.by_browser || [];
+      document.getElementById('browserEmpty').style.display = browsers.length ? 'none' : 'block';
+      browserChart = renderBarChart('browserChart', browserChart,
+        browsers.map(function (r) { return r.browser || 'Unknown'; }),
+        browsers.map(function (r) { return r.n; }), '#5cffc7');
+
+      fillTable('linksTable', 'linksEmpty', data.top_links || [], ['link_url', 'link_text', 'n']);
+      fillTable('recentTable', 'recentEmpty', data.recent || [], ['event_type', 'page_url', 'country', 'browser', 'created_at']);
+
+      setStatus('Loaded ' + (data.days || days) + '-day summary for ' + site + '.');
+    } catch (e) {
+      setStatus('Could not load data: ' + e.message + '. Is the Worker deployed and CORS-configured?', true);
+    }
+  }
+
+  document.getElementById('loadBtn').addEventListener('click', load);
+})();
+</script>
+
+</body>
+</html>
