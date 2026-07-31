@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What This Site Can See About You — PDL Analytics</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #2a2f3a;
+    --text: #e8eaf0; --muted: #8b93a7; --accent: #7c5cff; --good: #5cffc7; --warn: #ffb45c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); padding: 28px 20px 60px; line-height: 1.5;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  .lede { color: var(--muted); font-size: 15px; margin-bottom: 6px; max-width: 640px; }
+  .notice {
+    background: rgba(124,92,255,.08); border: 1px solid rgba(124,92,255,.35); border-radius: 10px;
+    padding: 14px 16px; font-size: 13.5px; color: #cfc8ff; margin: 18px 0 28px;
+  }
+  .notice a { color: var(--good); }
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    margin: 30px 0 10px; font-weight: 700;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  }
+  .card .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .card .v { font-size: 15px; font-weight: 600; word-break: break-word; }
+  .card .v.empty { color: var(--muted); font-weight: 400; font-style: italic; }
+  .card.highlight { border-color: rgba(124,92,255,.5); background: rgba(124,92,255,.06); }
+  .flag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 100px; margin-left: 6px; }
+  .flag.yes { background: rgba(92,255,199,.15); color: var(--good); }
+  .flag.no { background: rgba(255,255,255,.06); color: var(--muted); }
+  .endpoint-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+    font-size: 13px; color: var(--muted); margin-top: 8px;
+  }
+  .endpoint-box input {
+    width: 100%; background: #0f1115; border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 6px; font-size: 13px; margin-top: 6px;
+  }
+  .status { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  footer { margin-top: 40px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 16px; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>What This Site Can See About You</h1>
+  <p class="lede">
+    This page shows — in plain language — every piece of information a website can
+    collect about a visitor using nothing but standard browser and network
+    features. Nothing below required a permission prompt (no camera, microphone,
+    or precise GPS access), and nothing is hidden from you: it's the same data
+    this analytics tool would record if it were tracking you for real.
+  </p>
+  <div class="notice">
+    <strong>Why this looks like so much:</strong> every website you visit can see
+    most of this already — it's built into how browsers make requests. This tool
+    just makes it visible instead of invisible. See
+    <a href="./README.md">README.md</a> for exactly what's stored, for how long,
+    and how to opt out.
+  </div>
+
+  <div id="statusMsg" class="status">Detecting…</div>
+
+  <div class="section-title">Network &amp; Location</div>
+  <div class="grid" id="gridNetwork"></div>
+
+  <div class="section-title">Device &amp; Browser</div>
+  <div class="grid" id="gridDevice"></div>
+
+  <div class="section-title">Display</div>
+  <div class="grid" id="gridDisplay"></div>
+
+  <div class="section-title">Preferences &amp; Environment</div>
+  <div class="grid" id="gridEnv"></div>
+
+  <div class="section-title">Connect to a live Worker (optional)</div>
+  <div class="endpoint-box">
+    By default this page only inspects your browser locally — nothing is sent
+    anywhere. Enter a deployed Worker URL below to also see what the server
+    detects about your connection (IP, TLS, edge routing) and to test the
+    <code>/api/whoami</code> endpoint live.
+    <input id="endpointInput" type="text" placeholder="https://your-worker.workers.dev">
+    <div id="serverStatus" class="status"></div>
+  </div>
+  <div class="section-title" id="serverTitle" style="display:none;">Server-Detected (from Worker)</div>
+  <div class="grid" id="gridServer"></div>
+
+  <footer>
+    PDL Analytics — self-hosted, transparent visitor analytics scaffold.
+    Not deployed as a live tracker anywhere yet. See
+    <a href="./README.md">README.md</a> for the full data dictionary and
+    the "before this goes live" checklist.
+  </footer>
+</div>
+
+<script src="./analytics.js"></script>
+<script>
+(function () {
+  function card(label, value, opts) {
+    opts = opts || {};
+    var div = document.createElement('div');
+    div.className = 'card' + (opts.highlight ? ' highlight' : '');
+    var display = (value === null || value === undefined || value === '') ? '<span class="empty">not available</span>' : String(value);
+    if (typeof value === 'boolean') {
+      display = '<span class="flag ' + (value ? 'yes' : 'no') + '">' + (value ? 'YES' : 'NO') + '</span>';
+    }
+    div.innerHTML = '<div class="k">' + label + '</div><div class="v">' + display + '</div>';
+    return div;
+  }
+
+  function render(containerId, entries) {
+    var el = document.getElementById(containerId);
+    entries.forEach(function (e) { el.appendChild(card(e[0], e[1], e[2])); });
+  }
+
+  var info = window.PDLAnalytics ? window.PDLAnalytics.inspect() : {};
+
+  render('gridNetwork', [
+    ['Timezone', info.timezone],
+    ['Language', info.language],
+    ['All languages', info.languages],
+    ['UTC offset (min)', info.tz_offset_min],
+    ['Connection type', info.conn_type || 'unavailable (Chrome/Android only)'],
+    ['Downlink speed', info.conn_downlink_mbps ? info.conn_downlink_mbps + ' Mbps' : ''],
+    ['Est. round-trip', info.conn_rtt_ms ? info.conn_rtt_ms + ' ms' : ''],
+    ['Data saver on', info.conn_save_data]
+  ]);
+
+  render('gridDevice', [
+    ['Platform', info.platform],
+    ['Browser vendor', info.vendor],
+    ['CPU cores', info.cpu_cores],
+    ['Device memory', info.device_memory_gb ? info.device_memory_gb + ' GB' : ''],
+    ['Touch capable', info.touch_capable],
+    ['Max touch points', info.max_touch_points],
+    ['GPU vendor', info.gpu_vendor],
+    ['GPU renderer', info.gpu_renderer, { highlight: true }],
+    ['Browser fingerprint hash', info.canvas_fp]
+  ]);
+
+  render('gridDisplay', [
+    ['Screen resolution', info.screen_w + ' × ' + info.screen_h],
+    ['Available screen', info.avail_w + ' × ' + info.avail_h],
+    ['Viewport (this window)', info.viewport_w + ' × ' + info.viewport_h],
+    ['Color depth', info.color_depth + '-bit'],
+    ['Pixel ratio', info.pixel_ratio + 'x'],
+    ['Orientation', info.orientation]
+  ]);
+
+  render('gridEnv', [
+    ['Dark mode preferred', info.prefers_dark],
+    ['Reduced motion preferred', info.prefers_reduced_motion],
+    ['Running as installed app', info.standalone_pwa],
+    ['Cookies enabled', info.cookies_enabled],
+    ['"Do Not Track" sent', info.do_not_track],
+    ['Local storage supported', info.storage_supported],
+    ['Page title', info.page_title]
+  ]);
+
+  document.getElementById('statusMsg').textContent =
+    'Detected ' + document.querySelectorAll('.card').length + ' data points from your browser alone — no server contacted.';
+
+  // Optional: hit a live Worker's /api/whoami if the user provides one.
+  document.getElementById('endpointInput').addEventListener('change', function (e) {
+    var base = e.target.value.trim().replace(/\/$/, '');
+    if (!base) return;
+    var statusEl = document.getElementById('serverStatus');
+    statusEl.textContent = 'Contacting Worker…';
+    fetch(base + '/api/whoami')
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
+        var d = data.server_detected || {};
+        var edge = d.edge || {};
+        var ua = d.user_agent || {};
+        document.getElementById('serverTitle').style.display = 'block';
+        render('gridServer', [
+          ['IP address', d.ip_address, { highlight: true }],
+          ['Country', edge.country],
+          ['Region', edge.region],
+          ['City', edge.city],
+          ['Postal code', edge.postalCode],
+          ['Latitude / Longitude', (edge.latitude && edge.longitude) ? (edge.latitude + ', ' + edge.longitude) : ''],
+          ['ISP / Network', edge.asOrganization],
+          ['ASN', edge.asn],
+          ['Cloudflare edge location', edge.colo],
+          ['HTTP protocol', edge.httpProtocol],
+          ['TLS version', edge.tlsVersion],
+          ['OS (server-parsed)', ua.os + ' ' + (ua.osVersion || '')],
+          ['Browser (server-parsed)', ua.browser + ' ' + (ua.browserVersion || '')],
+          ['Rendering engine', ua.engine],
+          ['Raw User-Agent string', d.raw_user_agent]
+        ]);
+        statusEl.textContent = 'Live data from your deployed Worker.';
+      })
+      .catch(function (err) {
+        statusEl.textContent = 'Could not reach Worker: ' + err.message;
+      });
+  });
+})();
+</script>
+</body>
+</html>

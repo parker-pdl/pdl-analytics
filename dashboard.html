@@ -91,6 +91,8 @@
     <div class="stat"><div class="num" id="totPageviews">–</div><div class="lbl">Pageviews</div></div>
     <div class="stat"><div class="num" id="totClicks">–</div><div class="lbl">Link clicks</div></div>
     <div class="stat"><div class="num" id="totVisitors">–</div><div class="lbl">Unique visitors</div></div>
+    <div class="stat"><div class="num" id="totAvgTime">–</div><div class="lbl">Avg time on page</div></div>
+    <div class="stat"><div class="num" id="totAdblock">–</div><div class="lbl">Adblock users</div></div>
   </div>
 </div>
 
@@ -108,6 +110,12 @@
   </div>
 
   <div class="card">
+    <h2>Device type</h2>
+    <canvas id="deviceChart" height="220"></canvas>
+    <div id="deviceEmpty" class="empty" style="display:none;">No data yet</div>
+  </div>
+
+  <div class="card">
     <h2>Top clicked links</h2>
     <table id="linksTable">
       <thead><tr><th>Link</th><th>Text</th><th>Clicks</th></tr></thead>
@@ -117,9 +125,18 @@
   </div>
 
   <div class="card">
+    <h2>Top GPUs (device fingerprint)</h2>
+    <table id="gpuTable">
+      <thead><tr><th>GPU / Renderer</th><th>Count</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="gpuEmpty" class="empty" style="display:none;">No data yet</div>
+  </div>
+
+  <div class="card">
     <h2>Recent events</h2>
     <table id="recentTable">
-      <thead><tr><th>Type</th><th>Page</th><th>Country</th><th>Browser</th><th>When</th></tr></thead>
+      <thead><tr><th>Type</th><th>Page</th><th>Country</th><th>Browser</th><th>Device</th><th>When</th></tr></thead>
       <tbody></tbody>
     </table>
     <div id="recentEmpty" class="empty" style="display:none;">No events recorded yet</div>
@@ -128,7 +145,7 @@
 
 <script>
 (function () {
-  var countryChart = null, browserChart = null;
+  var countryChart = null, browserChart = null, deviceChart = null;
 
   function setStatus(msg, isError) {
     var el = document.getElementById('statusMsg');
@@ -186,6 +203,9 @@
       document.getElementById('totPageviews').textContent = data.totals.pageviews || 0;
       document.getElementById('totClicks').textContent = data.totals.clicks || 0;
       document.getElementById('totVisitors').textContent = data.totals.visitors || 0;
+      document.getElementById('totAvgTime').textContent = data.totals.avg_time_on_page_sec
+        ? Math.round(data.totals.avg_time_on_page_sec) + 's' : '–';
+      document.getElementById('totAdblock').textContent = data.totals.adblock_users || 0;
 
       var countries = data.by_country || [];
       document.getElementById('countryEmpty').style.display = countries.length ? 'none' : 'block';
@@ -196,11 +216,18 @@
       var browsers = data.by_browser || [];
       document.getElementById('browserEmpty').style.display = browsers.length ? 'none' : 'block';
       browserChart = renderBarChart('browserChart', browserChart,
-        browsers.map(function (r) { return r.browser || 'Unknown'; }),
+        browsers.map(function (r) { return (r.browser || 'Unknown') + (r.browser_version ? ' ' + r.browser_version : ''); }),
         browsers.map(function (r) { return r.n; }), '#5cffc7');
 
+      var devices = data.by_device || [];
+      document.getElementById('deviceEmpty').style.display = devices.length ? 'none' : 'block';
+      deviceChart = renderBarChart('deviceChart', deviceChart,
+        devices.map(function (r) { return r.device_type || 'Unknown'; }),
+        devices.map(function (r) { return r.n; }), '#ffb45c');
+
       fillTable('linksTable', 'linksEmpty', data.top_links || [], ['link_url', 'link_text', 'n']);
-      fillTable('recentTable', 'recentEmpty', data.recent || [], ['event_type', 'page_url', 'country', 'browser', 'created_at']);
+      fillTable('gpuTable', 'gpuEmpty', data.by_gpu || [], ['gpu_renderer', 'n']);
+      fillTable('recentTable', 'recentEmpty', data.recent || [], ['event_type', 'page_url', 'country', 'browser', 'device_type', 'created_at']);
 
       setStatus('Loaded ' + (data.days || days) + '-day summary for ' + site + '.');
     } catch (e) {
