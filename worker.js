@@ -188,9 +188,14 @@ async function handleSummary(request, env, ctx) {
   var origin = request.headers.get('Origin') || '';
   var headers = corsHeaders(origin, env);
 
-  // TODO before going live: require authentication here (e.g. a shared
-  // secret header, or Cloudflare Access) — right now anyone who finds this
-  // URL can read the aggregated stats for `site`.
+  // Auth: requires "Authorization: Bearer <ADMIN_TOKEN>" matching the
+  // ADMIN_TOKEN secret set on the Worker. Without this, anyone who found
+  // the URL could read all aggregated stats, including IPs in `recent`.
+  var authHeader = request.headers.get('Authorization') || '';
+  var providedToken = authHeader.replace(/^Bearer\s+/i, '');
+  if (!env.ADMIN_TOKEN || providedToken !== env.ADMIN_TOKEN) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: headers });
+  }
 
   var url = new URL(request.url);
   var site = url.searchParams.get('site');

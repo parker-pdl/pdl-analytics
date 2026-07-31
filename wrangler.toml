@@ -1,11 +1,16 @@
-# PDL Analytics — Cloudflare Worker config (scaffold)
+# PDL Analytics — Cloudflare Worker config
 #
-# This is NOT ready to deploy as-is:
-#   - database_id below is a placeholder. Run `wrangler d1 create pdl-analytics`
-#     and paste the real id in before `wrangler deploy` will work.
-#   - ALLOWED_ORIGINS below is a placeholder. Set it to the real site origins
-#     you want allowed to send events before going live.
-#   - /api/summary in worker.js still needs real authentication — see README.md.
+# Reference only when deploying via the Cloudflare dashboard (no wrangler
+# CLI login available) — the dashboard's own D1 binding + environment
+# variable + secret UI is the actual source of truth for a dashboard-based
+# deploy. Keep this file in sync afterward so a future `wrangler` deploy
+# matches what's live.
+#
+#   - database_id below is a placeholder until the D1 database is created;
+#     update it with the real id once that's done.
+#   - ALLOWED_ORIGINS is set to the real site origin (parkerdata.link).
+#   - ADMIN_TOKEN must be set as a Worker SECRET (not a plain var) — never
+#     commit the real token value to this file or to git.
 
 name = "pdl-analytics"
 main = "worker.js"
@@ -18,3 +23,6 @@ database_id = "REPLACE_ME"
 
 [vars]
 ALLOWED_ORIGINS = "https://parkerdata.link,https://www.parkerdata.link"
+
+# ADMIN_TOKEN is intentionally NOT set here — set it as a secret via
+# `wrangler secret put ADMIN_TOKEN` or the dashboard's "Secrets" UI instead.

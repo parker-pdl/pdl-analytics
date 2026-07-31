@@ -73,6 +73,10 @@
     <input id="site" type="text" placeholder="parkerdata.link">
   </div>
   <div class="field">
+    <label for="token">Admin token</label>
+    <input id="token" type="password" placeholder="paste ADMIN_TOKEN">
+  </div>
+  <div class="field">
     <label for="days">Window</label>
     <select id="days">
       <option value="7">Last 7 days</option>
@@ -187,16 +191,24 @@
   async function load() {
     var endpoint = document.getElementById('endpoint').value.trim().replace(/\/$/, '');
     var site = document.getElementById('site').value.trim();
+    var token = document.getElementById('token').value.trim();
     var days = document.getElementById('days').value;
 
     if (!endpoint || !site) {
       setStatus('Enter both a Worker endpoint and a site name.', true);
       return;
     }
+    if (!token) {
+      setStatus('Enter the admin token (set as the ADMIN_TOKEN secret on the Worker).', true);
+      return;
+    }
 
     setStatus('Loading…');
     try {
-      var res = await fetch(endpoint + '/api/summary?site=' + encodeURIComponent(site) + '&days=' + days);
+      var res = await fetch(endpoint + '/api/summary?site=' + encodeURIComponent(site) + '&days=' + days, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (res.status === 401) throw new Error('Unauthorized — check the admin token');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var data = await res.json();
 
